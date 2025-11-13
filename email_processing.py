@@ -1,14 +1,19 @@
+"""
+Email Processing Script - Analyzes extracted emails using OpenAI API
+Processes emails from the extractor output and enriches them with AI analysis.
+"""
 import asyncio
 import pandas as pd
 import re
 import time
+import os
 from xml.etree import ElementTree as ET
 from openai import AsyncOpenAI
 from tenacity import retry, wait_exponential, stop_after_attempt
 
 # === CONFIGURATION ===
-INPUT_EXCEL = "emails.xlsx"
-OUTPUT_EXCEL = "emails_final_async.xlsx"
+INPUT_EXCEL = "outputs/emails.xlsx"
+OUTPUT_EXCEL = "outputs/emails_processed.xlsx"
 MODEL = "gpt-4o-mini"
 CONCURRENCY = 10           # number of parallel requests
 SLEEP_BETWEEN_BATCHES = 0  # optional throttle
@@ -18,7 +23,7 @@ MAX_TOKENS = 700
 PROMPT_TEMPLATE = """You will be analyzing email data extracted from business correspondence related to water treatment equipment and solutions. The data contains fields such as ID, From_Name, Subject, Body, and other relevant information.
 
 <email_data>
-{{EMAIL_DATA}}
+{EMAIL_DATA}
 </email_data>
 
 Your task is to analyze each email record and extract specific information primarily from the "Subject" and "Body" fields, focusing on emails that are requests for quotations of water treatment equipment or solutions.
@@ -82,6 +87,7 @@ Provide only the structured analysis for each email record as specified above, w
 
 # === BUILD EMAIL XML BLOCK ===
 def build_email_block(row, idx):
+    """Build XML block for a single email."""
     return (
         f"<ID>{idx+1}</ID>\n"
         f"<From_Name>{row.get('From_Name','')}</From_Name>\n"
@@ -100,7 +106,7 @@ client = AsyncOpenAI()
 async def analyze_email(idx, row):
     """Single async API call with retry."""
     email_data = build_email_block(row, idx)
-    prompt = PROMPT_TEMPLATE.format(email_data=email_data, record_id=idx+1)
+    prompt = PROMPT_TEMPLATE.format(EMAIL_DATA=email_data)
 
     try:
         response = await client.chat.completions.create(
@@ -117,6 +123,7 @@ async def analyze_email(idx, row):
 
 # === PARSE XML RESPONSE ===
 def parse_xml(xml_text):
+    """Parse XML response from OpenAI API."""
     try:
         xml_clean = re.sub(r"[\x00-\x08\x0B\x0C\x0E-\x1F]", "", xml_text)
         root = ET.fromstring(xml_clean)
@@ -124,4 +131,110 @@ def parse_xml(xml_text):
             "record_id": root.findtext("record_id", "Not found"),
             "company_name": root.findtext("company_info/name", "Not specified"),
             "company_website": root.findtext("company_info/website", "Not mentioned"),
-            "company_country": root.findtext("company_info/country", "Not specif
+            "company_country": root.findtext("company_info/country", "Not specified"),
+            "email_category": root.findtext("email_category", "Not specified"),
+            "product_category": root.findtext("product_category", "Not specified"),
+            "equipment_requested": root.findtext("equipment_requested", "Not specified"),
+            "technical_specifications": root.findtext("technical_specifications", "None specified"),
+            "subject_body_correlation": root.findtext("subject_body_correlation", "Not specified")
+        }
+    except Exception as e:
+        print(f"⚠️  XML parse error: {e}")
+        return {
+            "record_id": "Parse error",
+            "company_name": "Parse error",
+            "company_website": "Parse error",
+            "company_country": "Parse error",
+            "email_category": "Parse error",
+            "product_category": "Parse error",
+            "equipment_requested": "Parse error",
+            "technical_specifications": "Parse error",
+            "subject_body_correlation": "Parse error"
+        }
+
+# === ASYNC BATCH PROCESSING ===
+async def process_batch(batch_indices, df):
+    """Process a batch of emails concurrently."""
+    tasks = [analyze_email(idx, df.iloc[idx]) for idx in batch_indices]
+    results = await asyncio.gather(*tasks)
+    return results
+
+async def process_all_emails(df):
+    """Process all emails in batches with concurrency control."""
+    total = len(df)
+    all_results = []
+
+    print(f"🚀 Processing {total} emails with concurrency={CONCURRENCY}...")
+
+    for i in range(0, total, CONCURRENCY):
+        batch_end = min(i + CONCURRENCY, total)
+        batch_indices = list(range(i, batch_end))
+
+        print(f"📧 Processing batch {i+1}-{batch_end} of {total}...")
+        batch_results = await process_batch(batch_indices, df)
+        all_results.extend(batch_results)
+
+        if SLEEP_BETWEEN_BATCHES > 0 and batch_end < total:
+            await asyncio.sleep(SLEEP_BETWEEN_BATCHES)
+
+    return all_results
+
+# === MAIN FUNCTION ===
+def main():
+    """Main entry point for email processing."""
+    print("=" * 60)
+    print("EMAIL PROCESSING WITH AI ANALYSIS")
+    print("=" * 60)
+
+    # Check if input file exists
+    if not os.path.exists(INPUT_EXCEL):
+        print(f"❌ Error: Input file '{INPUT_EXCEL}' not found!")
+        print(f"   Please run the extractor script first to generate the input file.")
+        return 1
+
+    # Load input Excel
+    print(f"📂 Loading input file: {INPUT_EXCEL}")
+    try:
+        df = pd.read_excel(INPUT_EXCEL)
+        print(f"✅ Loaded {len(df)} email records")
+    except Exception as e:
+        print(f"❌ Error loading Excel file: {e}")
+        return 1
+
+    if len(df) == 0:
+        print("⚠️  No emails to process!")
+        return 0
+
+    # Process emails asynchronously
+    start_time = time.time()
+    xml_results = asyncio.run(process_all_emails(df))
+
+    # Parse XML results
+    print("\n📊 Parsing AI analysis results...")
+    parsed_results = [parse_xml(xml_text) for xml_text in xml_results]
+
+    # Create output DataFrame
+    df_parsed = pd.DataFrame(parsed_results)
+
+    # Merge with original data
+    df_final = pd.concat([df.reset_index(drop=True), df_parsed], axis=1)
+
+    # Save output
+    os.makedirs(os.path.dirname(OUTPUT_EXCEL), exist_ok=True)
+    df_final.to_excel(OUTPUT_EXCEL, index=False)
+
+    elapsed_time = time.time() - start_time
+
+    # Print summary
+    print("\n" + "=" * 60)
+    print("✅ PROCESSING COMPLETE!")
+    print("=" * 60)
+    print(f"📊 Total emails processed: {len(df_final)}")
+    print(f"⏱️  Time elapsed: {elapsed_time:.2f} seconds")
+    print(f"💾 Output saved to: {OUTPUT_EXCEL}")
+    print("=" * 60)
+
+    return 0
+
+if __name__ == "__main__":
+    exit(main())

@@ -1,0 +1,18 @@
+# Core dependencies
+pandas>=2.0.0
+openpyxl>=3.0.0
+
+# Windows-specific (Outlook integration)
+pywin32>=300; sys_platform == 'win32'
+
+# Date/time utilities
+python-dateutil>=2.8.0
+
+# OpenAI API
+openai>=1.0.0
+
+# Retry logic
+tenacity>=8.0.0
+
+# Configuration
+pyyaml>=6.0
