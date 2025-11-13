@@ -11,7 +11,18 @@
 - [ ] **CHECK THE BOX:** "Add Python to PATH"
 - [ ] Test: Open Command Prompt, type `python --version`
 
-### ☐ 2. Get OpenAI API Key
+### ☐ 2. Get API Key (Choose One - OpenRouter Recommended)
+
+**Option A: OpenRouter (RECOMMENDED - Cheaper & More Options)**
+- [ ] Go to https://openrouter.ai/
+- [ ] Sign up / Log in
+- [ ] Go to https://openrouter.ai/keys
+- [ ] Click "Create Key"
+- [ ] Copy the key (starts with `sk-or-`)
+- [ ] Add credits at https://openrouter.ai/credits ($10 = ~200-300 emails)
+- [ ] Save key somewhere safe
+
+**Option B: Direct OpenAI**
 - [ ] Go to https://platform.openai.com/api-keys
 - [ ] Create account / Sign in
 - [ ] Click "Create new secret key"
@@ -24,20 +35,24 @@
 - [ ] Type: `pip install -r requirements.txt`
 - [ ] Wait for "Successfully installed" message
 
-### ☐ 4. Set API Key (Choose One Method)
+### ☐ 4. Set API Key (Choose Based on Step 2)
 
-**Method A - Set Each Time:**
-- [ ] Write this down: `set OPENAI_API_KEY=your-key-here`
+**If using OpenRouter (Method A - Set Each Time):**
+- [ ] Write this down: `set OPENROUTER_API_KEY=your-key-here`
 - [ ] You'll type this each time before running
 
-**Method B - Set Permanently (Recommended):**
+**If using OpenRouter (Method B - Set Permanently - RECOMMENDED):**
 - [ ] Press Windows Key, search "environment variables"
 - [ ] Click "Edit the system environment variables"
 - [ ] Click "Environment Variables" button
 - [ ] Click "New" under User variables
-- [ ] Name: `OPENAI_API_KEY`
+- [ ] Name: `OPENROUTER_API_KEY`
 - [ ] Value: (paste your API key)
 - [ ] Click OK on everything
+
+**If using Direct OpenAI:**
+- [ ] Same steps but use `OPENAI_API_KEY` instead
+- [ ] Edit `email_processing.py` line 20: Set `USE_OPENROUTER = False`
 
 ### ☐ 5. Edit Configuration File
 - [ ] Open `workflow_config.yaml` in Notepad

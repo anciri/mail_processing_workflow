@@ -1,6 +1,7 @@
 """
-Email Processing Script - Analyzes extracted emails using OpenAI API
+Email Processing Script - Analyzes extracted emails using AI API
 Processes emails from the extractor output and enriches them with AI analysis.
+Supports both OpenAI and OpenRouter.
 """
 import asyncio
 import pandas as pd
@@ -14,7 +15,25 @@ from tenacity import retry, wait_exponential, stop_after_attempt
 # === CONFIGURATION ===
 INPUT_EXCEL = "outputs/emails.xlsx"
 OUTPUT_EXCEL = "outputs/emails_processed.xlsx"
-MODEL = "gpt-4o-mini"
+
+# API Selection: Set to True to use OpenRouter, False for OpenAI directly
+USE_OPENROUTER = True
+
+# Model configuration
+if USE_OPENROUTER:
+    # OpenRouter models (see https://openrouter.ai/models for full list)
+    # Popular options:
+    # - "openai/gpt-4o-mini" - Fast and cheap OpenAI model
+    # - "anthropic/claude-3-haiku" - Fast Anthropic model
+    # - "google/gemini-flash-1.5" - Google's fast model
+    # - "meta-llama/llama-3.1-8b-instruct" - Open source option
+    MODEL = "openai/gpt-4o-mini"
+    API_KEY_ENV_VAR = "OPENROUTER_API_KEY"  # Use OPENROUTER_API_KEY instead of OPENAI_API_KEY
+else:
+    # Direct OpenAI models
+    MODEL = "gpt-4o-mini"
+    API_KEY_ENV_VAR = "OPENAI_API_KEY"
+
 CONCURRENCY = 10           # number of parallel requests
 SLEEP_BETWEEN_BATCHES = 0  # optional throttle
 MAX_TOKENS = 700
@@ -99,7 +118,36 @@ def build_email_block(row, idx):
     )
 
 # === CLIENT INIT (async) ===
-client = AsyncOpenAI()
+# Initialize client based on configuration
+if USE_OPENROUTER:
+    # OpenRouter configuration
+    api_key = os.environ.get(API_KEY_ENV_VAR)
+    if not api_key:
+        raise ValueError(
+            f"❌ {API_KEY_ENV_VAR} environment variable not set!\n"
+            f"   Get your key from: https://openrouter.ai/keys\n"
+            f"   Then set it: set {API_KEY_ENV_VAR}=your-key-here"
+        )
+    client = AsyncOpenAI(
+        base_url="https://openrouter.ai/api/v1",
+        api_key=api_key,
+        default_headers={
+            "HTTP-Referer": "https://github.com/anciri/mail_processing_workflow",
+            "X-Title": "Email Processing Workflow"
+        }
+    )
+    print(f"🔄 Using OpenRouter with model: {MODEL}")
+else:
+    # Direct OpenAI configuration
+    api_key = os.environ.get(API_KEY_ENV_VAR)
+    if not api_key:
+        raise ValueError(
+            f"❌ {API_KEY_ENV_VAR} environment variable not set!\n"
+            f"   Get your key from: https://platform.openai.com/api-keys\n"
+            f"   Then set it: set {API_KEY_ENV_VAR}=your-key-here"
+        )
+    client = AsyncOpenAI(api_key=api_key)
+    print(f"🤖 Using OpenAI directly with model: {MODEL}")
 
 # === RETRY DECORATOR ===
 @retry(wait=wait_exponential(multiplier=1, min=2, max=20), stop=stop_after_attempt(3))
