@@ -1,0 +1,67 @@
+# Email Workflow Configuration
+# This file contains all configuration settings for the email extraction and processing workflow
+
+# ============================================================================
+# EXTRACTION SETTINGS (extractor.py)
+# ============================================================================
+extraction:
+  # Outlook account and folder settings
+  target_account_email: "your_email@company.com"  # Change to your Outlook account
+  inbox_folder_name: "Inbox"
+  target_folder_name: "RFQ"                       # Main folder name
+  target_subfolder_name: ""                       # Subfolder name (leave empty if none)
+
+  # Output settings
+  output_dir: "outputs"
+  output_filename: "emails.xlsx"
+  excluded_filename: "emails_excluded.xlsx"
+  errors_filename: "emails_errors.xlsx"
+
+  # Processing settings
+  progress_interval: 10                            # Print progress every N items
+
+# ============================================================================
+# PROCESSING SETTINGS (email_processing.py)
+# ============================================================================
+processing:
+  # Input/Output files
+  input_file: "outputs/emails.xlsx"
+  output_file: "outputs/emails_processed.xlsx"
+
+  # OpenAI API settings
+  model: "gpt-4o-mini"                             # OpenAI model to use
+  max_tokens: 700                                  # Max tokens per request
+  temperature: 0                                   # Temperature for AI responses
+
+  # Concurrency settings
+  concurrency: 10                                  # Number of parallel API requests
+  sleep_between_batches: 0                         # Seconds to sleep between batches
+
+  # Retry settings
+  retry_attempts: 3                                # Number of retry attempts
+  retry_min_wait: 2                                # Minimum wait time (seconds)
+  retry_max_wait: 20                               # Maximum wait time (seconds)
+
+# ============================================================================
+# WORKFLOW SETTINGS (workflow.py)
+# ============================================================================
+workflow:
+  # Checkpoint behavior
+  require_checkpoint_confirmation: true            # Pause for user review between steps
+  auto_process: false                              # Skip checkpoint if true
+
+  # Default date filtering (optional)
+  # Uncomment to set default date filters
+  # default_start_date: "2024-01-01"
+  # default_end_date: "2024-12-31"
+
+# ============================================================================
+# ENVIRONMENT SETTINGS
+# ============================================================================
+environment:
+  # OpenAI API key - SET THIS IN YOUR ENVIRONMENT
+  # export OPENAI_API_KEY="your-api-key-here"
+  # Or create a .env file with: OPENAI_API_KEY=your-api-key-here
+
+  # Python path for virtual environment (optional)
+  # python_path: "/path/to/venv/bin/python"
