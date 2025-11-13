@@ -11,32 +11,29 @@ import os
 from xml.etree import ElementTree as ET
 from openai import AsyncOpenAI
 from tenacity import retry, wait_exponential, stop_after_attempt
+from config_loader import get_config
 
-# === CONFIGURATION ===
-INPUT_EXCEL = "outputs/emails.xlsx"
-OUTPUT_EXCEL = "outputs/emails_processed.xlsx"
+# === LOAD CONFIGURATION ===
+config = get_config()
+processing_config = config.get_section('processing')
 
-# API Selection: Set to True to use OpenRouter, False for OpenAI directly
-USE_OPENROUTER = True
+# Input/Output files
+INPUT_EXCEL = processing_config.get('input_file', 'outputs/emails.xlsx')
+OUTPUT_EXCEL = processing_config.get('output_file', 'outputs/emails_processed.xlsx')
 
-# Model configuration
-if USE_OPENROUTER:
-    # OpenRouter models (see https://openrouter.ai/models for full list)
-    # Popular options:
-    # - "openai/gpt-4o-mini" - Fast and cheap OpenAI model
-    # - "anthropic/claude-3-haiku" - Fast Anthropic model
-    # - "google/gemini-flash-1.5" - Google's fast model
-    # - "meta-llama/llama-3.1-8b-instruct" - Open source option
-    MODEL = "openai/gpt-4o-mini"
-    API_KEY_ENV_VAR = "OPENROUTER_API_KEY"  # Use OPENROUTER_API_KEY instead of OPENAI_API_KEY
-else:
-    # Direct OpenAI models
-    MODEL = "gpt-4o-mini"
-    API_KEY_ENV_VAR = "OPENAI_API_KEY"
+# API Configuration
+USE_OPENROUTER = config.should_use_openrouter()
+MODEL = processing_config.get('model', 'openai/gpt-4o-mini')
 
-CONCURRENCY = 10           # number of parallel requests
-SLEEP_BETWEEN_BATCHES = 0  # optional throttle
-MAX_TOKENS = 700
+# Processing settings
+MAX_TOKENS = processing_config.get('max_tokens', 700)
+CONCURRENCY = processing_config.get('concurrency', 10)
+SLEEP_BETWEEN_BATCHES = processing_config.get('sleep_between_batches', 0)
+
+# Retry settings
+RETRY_ATTEMPTS = processing_config.get('retry_attempts', 3)
+RETRY_MIN_WAIT = processing_config.get('retry_min_wait', 2)
+RETRY_MAX_WAIT = processing_config.get('retry_max_wait', 20)
 
 # === PROMPT TEMPLATE ===
 PROMPT_TEMPLATE = """You will be analyzing email data extracted from business correspondence related to water treatment equipment and solutions. The data contains fields such as ID, From_Name, Subject, Body, and other relevant information.
@@ -118,16 +115,15 @@ def build_email_block(row, idx):
     )
 
 # === CLIENT INIT (async) ===
+# Get API key from environment (loaded via config_loader)
+try:
+    api_key, key_type = config.get_api_key()
+except ValueError as e:
+    print(str(e))
+    exit(1)
+
 # Initialize client based on configuration
 if USE_OPENROUTER:
-    # OpenRouter configuration
-    api_key = os.environ.get(API_KEY_ENV_VAR)
-    if not api_key:
-        raise ValueError(
-            f"❌ {API_KEY_ENV_VAR} environment variable not set!\n"
-            f"   Get your key from: https://openrouter.ai/keys\n"
-            f"   Then set it: set {API_KEY_ENV_VAR}=your-key-here"
-        )
     client = AsyncOpenAI(
         base_url="https://openrouter.ai/api/v1",
         api_key=api_key,
@@ -138,19 +134,14 @@ if USE_OPENROUTER:
     )
     print(f"🔄 Using OpenRouter with model: {MODEL}")
 else:
-    # Direct OpenAI configuration
-    api_key = os.environ.get(API_KEY_ENV_VAR)
-    if not api_key:
-        raise ValueError(
-            f"❌ {API_KEY_ENV_VAR} environment variable not set!\n"
-            f"   Get your key from: https://platform.openai.com/api-keys\n"
-            f"   Then set it: set {API_KEY_ENV_VAR}=your-key-here"
-        )
     client = AsyncOpenAI(api_key=api_key)
     print(f"🤖 Using OpenAI directly with model: {MODEL}")
 
 # === RETRY DECORATOR ===
-@retry(wait=wait_exponential(multiplier=1, min=2, max=20), stop=stop_after_attempt(3))
+@retry(
+    wait=wait_exponential(multiplier=1, min=RETRY_MIN_WAIT, max=RETRY_MAX_WAIT),
+    stop=stop_after_attempt(RETRY_ATTEMPTS)
+)
 async def analyze_email(idx, row):
     """Single async API call with retry."""
     email_data = build_email_block(row, idx)

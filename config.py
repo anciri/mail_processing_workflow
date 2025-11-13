@@ -1,22 +1,24 @@
 """
 Configuration settings for the email extractor.
-Edit these values to match your Outlook setup.
+Loads settings from workflow_config.yaml.
 """
+from config_loader import get_config
+
+# Load configuration
+_config = get_config()
+_extraction_config = _config.get_section('extraction')
 
 # === OUTLOOK SETTINGS ===
-# Your Outlook email account
-TARGET_ACCOUNT_EMAIL = "your_email@company.com"  # CHANGE THIS to your email
-
-# Folder navigation (adjust to match your Outlook folder structure)
-INBOX_FOLDER_NAME = "Inbox"
-TARGET_FOLDER_NAME = "RFQ"  # CHANGE THIS to your folder name
-TARGET_SUBFOLDER_NAME = ""  # Leave empty if no subfolder, or set subfolder name
+TARGET_ACCOUNT_EMAIL = _extraction_config.get('target_account_email', 'your_email@company.com')
+INBOX_FOLDER_NAME = _extraction_config.get('inbox_folder_name', 'Inbox')
+TARGET_FOLDER_NAME = _extraction_config.get('target_folder_name', 'RFQ')
+TARGET_SUBFOLDER_NAME = _extraction_config.get('target_subfolder_name', '')
 
 # === OUTPUT SETTINGS ===
-OUTPUT_DIR = "outputs"
-OUTPUT_FILENAME = "emails.xlsx"
-EXCLUDED_FILENAME = "emails_excluded.xlsx"
-ERRORS_FILENAME = "emails_errors.xlsx"
+OUTPUT_DIR = _extraction_config.get('output_dir', 'outputs')
+OUTPUT_FILENAME = _extraction_config.get('output_filename', 'emails.xlsx')
+EXCLUDED_FILENAME = _extraction_config.get('excluded_filename', 'emails_excluded.xlsx')
+ERRORS_FILENAME = _extraction_config.get('errors_filename', 'emails_errors.xlsx')
 
 # === PROCESSING SETTINGS ===
-PROGRESS_INTERVAL = 10  # Print progress every N items
+PROGRESS_INTERVAL = _extraction_config.get('progress_interval', 10)
