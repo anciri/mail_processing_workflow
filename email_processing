@@ -1,0 +1,127 @@
+import asyncio
+import pandas as pd
+import re
+import time
+from xml.etree import ElementTree as ET
+from openai import AsyncOpenAI
+from tenacity import retry, wait_exponential, stop_after_attempt
+
+# === CONFIGURATION ===
+INPUT_EXCEL = "emails.xlsx"
+OUTPUT_EXCEL = "emails_final_async.xlsx"
+MODEL = "gpt-4o-mini"
+CONCURRENCY = 10           # number of parallel requests
+SLEEP_BETWEEN_BATCHES = 0  # optional throttle
+MAX_TOKENS = 700
+
+# === PROMPT TEMPLATE ===
+PROMPT_TEMPLATE = """You will be analyzing email data extracted from business correspondence related to water treatment equipment and solutions. The data contains fields such as ID, From_Name, Subject, Body, and other relevant information.
+
+<email_data>
+{{EMAIL_DATA}}
+</email_data>
+
+Your task is to analyze each email record and extract specific information primarily from the "Subject" and "Body" fields, focusing on emails that are requests for quotations of water treatment equipment or solutions.
+
+**Product Categorization List:**
+When identifying equipment or products, you should categorize them using items from this preferred list whenever possible:
+Agitadores, Aireadores, Almacenamiento, Arqueta, Asesoramiento, Biodigestor, Biodiscos, Bombas, Canal Parshall, Cavitador CAF, Clarificadores, Colector, Compresor, Compuerta, Compuertas, Contenedor, Cuadro electrico, Cucharas bivalva, Decantador centrífugo, Decantador lamelar, Decantador SBR, Desarenador, Desarenador cicloidal, Desarenador desengrasador, Desbaste, Deshidratación purín, Deshidratador centrifugo, Deshidratador filtro pensa, Desinfección por cloración, Desnatador, Difusores, Equipo para sistema de agua desalinizada, Equipos electromecánicos, Equipos pretratamiento y espesamiento, Estudios, Evaporadaror, Fabricación planta tratamiento, Filtración, Filtro carbon activado, Filtro prensa, Floculador, Floculante, Generador de microburbuja, Generador de Ozono, Instrumentación, Inyector, Mantenimiento, Membranas MBR, Mezclador, Osmosis inversa, Pasamuro, Planta de biogás, Planta de pretratamiento, Planta de pretratamiento compacta, Planta de tratamiento, Planta pilloto, Planta poli, Planta tratamiento compacta, PLC de control, Polipastos, Polymer feed pump, Pozo de bombeos, pressure booster pump, Reja de desbaste, Reja desbaste, Rental and, Repuestos Tornillo deshidratador de lodo, Sacor filtrantes, Separador de grasas, Separador de hidrocarburos, Separador solido liquido, Separadores de lodos ciclónicos, Silo decantador, Sinfin, Sistema CAF, Sistema coagulacion floculación, Sistema DAF, sistema de extracción de lodos, Sistema de medición continua, Sistema de neutralización de gas clorado, Sistema de ultrafiltración, Sistema desalinización, Sistema desodorización, Sistema electroquimico, Sistema FCM, Sistema llenado botellas, Sistema lodos activados, Sistema MBBR, Sistema MBR, Sistema SBR, Soplante, Tamiz compactador, Tamiz de aliviadero, Tamiz rotativo, Tanque de mazcla, Tanque de tormentas, Tolva, Tornillo deshidratador de lodo, Tratamiento biológico, Tratamiento reactores secuenciales, Tratamiento terciario, Tubos, Valvulas, Varios.
+
+**Information Extraction Requirements:**
+
+For each email record, extract and categorize the following:
+
+**Company Information (from Body field):**
+- Company name
+- Website (if mentioned)
+- Country of the sending company
+
+**Email Categorization:**
+Classify each email into one of these categories:
+- "Solución de tratamiento compleja" (Complex treatment solution)
+- "Productos" (Products)
+
+**Equipment Information:**
+- Identify the type of equipment being requested, preferably selecting from the categorization list above
+- Cross-reference information from both Subject and Body fields
+- Note any specific technical requirements or specifications mentioned
+
+**Analysis Process:**
+1. First examine the Subject field for initial equipment type indicators
+2. Then analyze the Body field for detailed equipment specifications and company information
+3. Always cross-reference Subject and Body content to ensure accuracy
+4. Look for keywords related to water treatment such as: filtration, purification, desalination, reverse osmosis, water treatment plants, pumps, filters, membranes, etc.
+5. When categorizing products, match them to the provided categorization list whenever possible
+
+**Output Format:**
+For each email record, provide your analysis in the following structure:
+
+<analysis>
+<record_id>[ID from the data]</record_id>
+<company_info>
+<name>[Company name or "Not specified"]</name>
+<website>[Website URL or "Not mentioned"]</website>
+<country>[Country or "Not specified"]</country>
+</company_info>
+<email_category>[Solución de tratamiento compleja/Productos]</email_category>
+<product_category>[Category from the provided list, or "Other" if not found in list]</product_category>
+<equipment_requested>[Detailed description of equipment/solution requested]</equipment_requested>
+<technical_specifications>[Any specific technical requirements mentioned or "None specified"]</technical_specifications>
+<subject_body_correlation>[Brief note on how Subject and Body information align or differ]</subject_body_correlation>
+</analysis>
+
+**Important Guidelines:**
+- If company information is not clearly stated in the Body field, mark as "Not specified"
+- When equipment type is unclear, provide your best assessment based on available context
+- Always prioritize information from the Body field over Subject when there are discrepancies
+- Focus only on emails that appear to be genuine business inquiries for water treatment solutions
+- When selecting product categories, prioritize exact matches from the provided list, then close matches, and only use "Other" when no reasonable match exists
+
+Provide only the structured analysis for each email record as specified above, with no additional commentary or explanations outside the analysis tags.
+"""
+
+# === BUILD EMAIL XML BLOCK ===
+def build_email_block(row, idx):
+    return (
+        f"<ID>{idx+1}</ID>\n"
+        f"<From_Name>{row.get('From_Name','')}</From_Name>\n"
+        f"<From_Email>{row.get('From_Email','')}</From_Email>\n"
+        f"<To>{row.get('To','')}</To>\n"
+        f"<Date>{row.get('Date','')}</Date>\n"
+        f"<Subject>{row.get('Subject','')}</Subject>\n"
+        f"<Body>{row.get('Body','')}</Body>"
+    )
+
+# === CLIENT INIT (async) ===
+client = AsyncOpenAI()
+
+# === RETRY DECORATOR ===
+@retry(wait=wait_exponential(multiplier=1, min=2, max=20), stop=stop_after_attempt(3))
+async def analyze_email(idx, row):
+    """Single async API call with retry."""
+    email_data = build_email_block(row, idx)
+    prompt = PROMPT_TEMPLATE.format(email_data=email_data, record_id=idx+1)
+
+    try:
+        response = await client.chat.completions.create(
+            model=MODEL,
+            messages=[{"role": "user", "content": prompt}],
+            max_tokens=MAX_TOKENS,
+            temperature=0
+        )
+        content = response.choices[0].message.content.strip()
+        return content
+    except Exception as e:
+        print(f"❌ Error on row {idx+1}: {e}")
+        return "<analysis><record_id>error</record_id></analysis>"
+
+# === PARSE XML RESPONSE ===
+def parse_xml(xml_text):
+    try:
+        xml_clean = re.sub(r"[\x00-\x08\x0B\x0C\x0E-\x1F]", "", xml_text)
+        root = ET.fromstring(xml_clean)
+        return {
+            "record_id": root.findtext("record_id", "Not found"),
+            "company_name": root.findtext("company_info/name", "Not specified"),
+            "company_website": root.findtext("company_info/website", "Not mentioned"),
+            "company_country": root.findtext("company_info/country", "Not specif
