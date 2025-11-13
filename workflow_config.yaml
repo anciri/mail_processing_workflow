@@ -6,10 +6,10 @@
 # ============================================================================
 extraction:
   # Outlook account and folder settings
-  target_account_email: "your_email@company.com"  # Change to your Outlook account
-  inbox_folder_name: "Inbox"
-  target_folder_name: "RFQ"                       # Main folder name
-  target_subfolder_name: ""                       # Subfolder name (leave empty if none)
+  target_account_email: "a.ciricugno@tevalcor.com"  # Change to your Outlook account
+  inbox_folder_name: "Bandeja de entrada"
+  target_folder_name: "TAGA"                       # Main folder name
+  target_subfolder_name: "RFQ"                       # Subfolder name (leave empty if none)
 
   # Output settings
   output_dir: "outputs"
@@ -60,7 +60,7 @@ workflow:
 # ============================================================================
 environment:
   # OpenAI API key - SET THIS IN YOUR ENVIRONMENT
-  # export OPENAI_API_KEY="your-api-key-here"
+  OPENROUTER_API_KEY="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"
   # Or create a .env file with: OPENAI_API_KEY=your-api-key-here
 
   # Python path for virtual environment (optional)

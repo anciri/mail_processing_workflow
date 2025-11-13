@@ -14,6 +14,15 @@ from tenacity import retry, wait_exponential, stop_after_attempt
 # === CONFIGURATION ===
 INPUT_EXCEL = "outputs/emails.xlsx"
 OUTPUT_EXCEL = "outputs/emails_processed.xlsx"
+# # Try Google's cheaper model
+# MODEL = "google/gemini-flash-1.5"
+
+# # Or Anthropic's Claude
+# MODEL = "anthropic/claude-3-haiku"
+
+# # Or even free options
+# MODEL = "meta-llama/llama-3.1-8b-instruct:free"
+
 MODEL = "gpt-4o-mini"
 CONCURRENCY = 10           # number of parallel requests
 SLEEP_BETWEEN_BATCHES = 0  # optional throttle
