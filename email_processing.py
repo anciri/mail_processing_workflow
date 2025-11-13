@@ -154,17 +154,70 @@ async def analyze_email(idx, row):
             max_tokens=MAX_TOKENS,
             temperature=0
         )
-        content = response.choices[0].message.content.strip()
+        content = response.choices[0].message.content
+
+        # Validate response
+        if not content:
+            print(f"⚠️  Empty response for email {idx+1}")
+            return "<analysis><record_id>error</record_id><company_info><name>Empty response</name></company_info></analysis>"
+
+        content = content.strip()
+
+        # Check if response contains XML
+        if not content.startswith("<analysis>"):
+            print(f"⚠️  Invalid format for email {idx+1} - response doesn't start with <analysis>")
+            print(f"   First 100 chars: {content[:100]}")
+            # Try to extract XML if it's embedded in text
+            if "<analysis>" in content:
+                start_idx = content.find("<analysis>")
+                end_idx = content.find("</analysis>") + len("</analysis>")
+                if end_idx > start_idx:
+                    content = content[start_idx:end_idx]
+            else:
+                return "<analysis><record_id>error</record_id><company_info><name>Invalid XML format</name></company_info></analysis>"
+
         return content
     except Exception as e:
-        print(f"❌ Error on row {idx+1}: {e}")
-        return "<analysis><record_id>error</record_id></analysis>"
+        print(f"❌ Error on email {idx+1}: {e}")
+        return "<analysis><record_id>error</record_id><company_info><name>API Error</name></company_info></analysis>"
 
 # === PARSE XML RESPONSE ===
 def parse_xml(xml_text):
-    """Parse XML response from OpenAI API."""
+    """Parse XML response from AI API."""
+    # Handle empty or None responses
+    if not xml_text:
+        print(f"⚠️  XML parse error: Empty or None response")
+        return {
+            "record_id": "Empty response",
+            "company_name": "N/A",
+            "company_website": "N/A",
+            "company_country": "N/A",
+            "email_category": "N/A",
+            "product_category": "N/A",
+            "equipment_requested": "N/A",
+            "technical_specifications": "N/A",
+            "subject_body_correlation": "N/A"
+        }
+
     try:
+        # Remove control characters
         xml_clean = re.sub(r"[\x00-\x08\x0B\x0C\x0E-\x1F]", "", xml_text)
+
+        # Check if cleaned text is empty
+        if not xml_clean.strip():
+            print(f"⚠️  XML parse error: Empty after cleaning")
+            return {
+                "record_id": "Empty after cleaning",
+                "company_name": "N/A",
+                "company_website": "N/A",
+                "company_country": "N/A",
+                "email_category": "N/A",
+                "product_category": "N/A",
+                "equipment_requested": "N/A",
+                "technical_specifications": "N/A",
+                "subject_body_correlation": "N/A"
+            }
+
         root = ET.fromstring(xml_clean)
         return {
             "record_id": root.findtext("record_id", "Not found"),
@@ -177,10 +230,11 @@ def parse_xml(xml_text):
             "technical_specifications": root.findtext("technical_specifications", "None specified"),
             "subject_body_correlation": root.findtext("subject_body_correlation", "Not specified")
         }
-    except Exception as e:
+    except ET.ParseError as e:
         print(f"⚠️  XML parse error: {e}")
+        print(f"   XML preview (first 200 chars): {xml_text[:200]}")
         return {
-            "record_id": "Parse error",
+            "record_id": "XML parse error",
             "company_name": "Parse error",
             "company_website": "Parse error",
             "company_country": "Parse error",
@@ -189,6 +243,19 @@ def parse_xml(xml_text):
             "equipment_requested": "Parse error",
             "technical_specifications": "Parse error",
             "subject_body_correlation": "Parse error"
+        }
+    except Exception as e:
+        print(f"⚠️  Unexpected error parsing XML: {e}")
+        return {
+            "record_id": "Unexpected error",
+            "company_name": "Error",
+            "company_website": "Error",
+            "company_country": "Error",
+            "email_category": "Error",
+            "product_category": "Error",
+            "equipment_requested": "Error",
+            "technical_specifications": "Error",
+            "subject_body_correlation": "Error"
         }
 
 # === ASYNC BATCH PROCESSING ===
