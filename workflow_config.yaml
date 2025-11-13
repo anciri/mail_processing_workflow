@@ -28,10 +28,21 @@ processing:
   input_file: "outputs/emails.xlsx"
   output_file: "outputs/emails_processed.xlsx"
 
-  # OpenAI API settings
-  model: "gpt-4o-mini"                             # OpenAI model to use
+  # API Selection
+  use_openrouter: true                             # true = Use OpenRouter, false = Direct OpenAI
+
+  # Model settings
+  # If using OpenRouter (recommended):
+  #   - "openai/gpt-4o-mini" - Fast and cheap ($0.15/$0.60 per 1M tokens)
+  #   - "google/gemini-flash-1.5" - Even cheaper ($0.075/$0.30 per 1M tokens)
+  #   - "anthropic/claude-3-haiku" - Fast Claude model
+  #   - See OPENROUTER_GUIDE.md for more options
+  # If using OpenAI directly:
+  #   - "gpt-4o-mini" - Fast and cheap
+  #   - "gpt-4o" - More capable but expensive
+  model: "openai/gpt-4o-mini"                      # Model to use (format depends on API)
   max_tokens: 700                                  # Max tokens per request
-  temperature: 0                                   # Temperature for AI responses
+  temperature: 0                                   # Temperature for AI responses (0 = deterministic)
 
   # Concurrency settings
   concurrency: 10                                  # Number of parallel API requests
@@ -59,9 +70,20 @@ workflow:
 # ENVIRONMENT SETTINGS
 # ============================================================================
 environment:
-  # OpenAI API key - SET THIS IN YOUR ENVIRONMENT
-  OPENROUTER_API_KEY="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"
-  # Or create a .env file with: OPENAI_API_KEY=your-api-key-here
+  # API Keys - SET ONE OF THESE IN YOUR ENVIRONMENT
+
+  # For OpenRouter (RECOMMENDED - cheaper and more options):
+  # 1. Get key from: https://openrouter.ai/keys
+  # 2. Set environment variable:
+  #    Windows: set OPENROUTER_API_KEY=sk-or-your-key-here
+  #    Linux/Mac: export OPENROUTER_API_KEY=sk-or-your-key-here
+  # 3. See OPENROUTER_GUIDE.md for detailed setup
+
+  # For Direct OpenAI:
+  # 1. Get key from: https://platform.openai.com/api-keys
+  # 2. Set environment variable:
+  #    Windows: set OPENAI_API_KEY=sk-your-key-here
+  #    Linux/Mac: export OPENAI_API_KEY=sk-your-key-here
 
   # Python path for virtual environment (optional)
   # python_path: "/path/to/venv/bin/python"
