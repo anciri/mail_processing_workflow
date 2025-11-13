@@ -6,10 +6,10 @@
 # ============================================================================
 extraction:
   # Outlook account and folder settings
-  target_account_email: "your_email@company.com"  # Change to your Outlook account
-  inbox_folder_name: "Inbox"
-  target_folder_name: "RFQ"                       # Main folder name
-  target_subfolder_name: ""                       # Subfolder name (leave empty if none)
+  target_account_email: "a.ciricugno@tevalcor.com"  # Change to your Outlook account
+  inbox_folder_name: "Bandeja de entrada"
+  target_folder_name: "TAGA"                       # Main folder name
+  target_subfolder_name: "RFQ"                       # Subfolder name (leave empty if none)
 
   # Output settings
   output_dir: "outputs"
