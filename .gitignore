@@ -42,6 +42,9 @@ ENV/
 .env
 .env.local
 
+# User-specific configuration (contains sensitive data)
+workflow_config.yaml
+
 # OS
 .DS_Store
 Thumbs.db
@@ -53,3 +56,8 @@ Thumbs.db
 config_local.py
 *_local.yaml
 credentials.json
+
+# User data and personal information
+outputs/
+*.xlsx
+*.xls
