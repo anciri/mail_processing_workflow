@@ -51,5 +51,7 @@ Thumbs.db
 
 # Sensitive data
 config_local.py
+config.py
 *_local.yaml
 credentials.json
+workflow_config.yaml
