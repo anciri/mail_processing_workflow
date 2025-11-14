@@ -1,15 +1,18 @@
-# Email Workflow Configuration
-# This file contains all configuration settings for the email extraction and processing workflow
+# Email Workflow Configuration - TEMPLATE
+# Copy this file to workflow_config.yaml and customize with your settings
+#
+# IMPORTANT: Never commit workflow_config.yaml with your real data!
+# It should be in .gitignore
 
 # ============================================================================
 # EXTRACTION SETTINGS (extractor.py)
 # ============================================================================
 extraction:
   # Outlook account and folder settings
-  target_account_email: "a.ciricugno@tevalcor.com"  # Change to your Outlook account
-  inbox_folder_name: "Bandeja de entrada"
-  target_folder_name: "TAGA"                       # Main folder name
-  target_subfolder_name: "RFQ"                       # Subfolder name (leave empty if none)
+  target_account_email: "your.email@company.com"  # ← CHANGE THIS to your email
+  inbox_folder_name: "Inbox"                      # or "Bandeja de entrada", etc.
+  target_folder_name: "YourFolder"                # ← CHANGE THIS to your folder
+  target_subfolder_name: ""                       # Optional subfolder name
 
   # Output settings
   output_dir: "outputs"
@@ -70,20 +73,18 @@ workflow:
 # ENVIRONMENT SETTINGS
 # ============================================================================
 environment:
-  # API Keys - SET ONE OF THESE IN YOUR ENVIRONMENT
+  # API Keys - SET ONE OF THESE IN YOUR .env FILE (not here!)
 
   # For OpenRouter (RECOMMENDED - cheaper and more options):
   # 1. Get key from: https://openrouter.ai/keys
-  # 2. Set environment variable:
-  #    Windows: set OPENROUTER_API_KEY=sk-or-your-key-here
-  #    Linux/Mac: export OPENROUTER_API_KEY=sk-or-your-key-here
+  # 2. Add to .env file:
+  #    OPENROUTER_API_KEY=sk-or-your-key-here
   # 3. See OPENROUTER_GUIDE.md for detailed setup
 
   # For Direct OpenAI:
   # 1. Get key from: https://platform.openai.com/api-keys
-  # 2. Set environment variable:
-  #    Windows: set OPENAI_API_KEY=sk-your-key-here
-  #    Linux/Mac: export OPENAI_API_KEY=sk-your-key-here
+  # 2. Add to .env file:
+  #    OPENAI_API_KEY=sk-your-key-here
 
   # Python path for virtual environment (optional)
   # python_path: "/path/to/venv/bin/python"

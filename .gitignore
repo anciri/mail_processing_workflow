@@ -42,6 +42,9 @@ ENV/
 .env
 .env.local
 
+# User-specific configuration (contains sensitive data)
+workflow_config.yaml
+
 # OS
 .DS_Store
 Thumbs.db
