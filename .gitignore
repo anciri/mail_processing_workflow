@@ -54,10 +54,7 @@ Thumbs.db
 
 # Sensitive data
 config_local.py
+config.py
 *_local.yaml
 credentials.json
-
-# User data and personal information
-outputs/
-*.xlsx
-*.xls
+workflow_config.yaml
