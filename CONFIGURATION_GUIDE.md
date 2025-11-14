@@ -42,8 +42,8 @@ Edit `workflow_config.yaml` to match your setup:
 extraction:
   target_account_email: "your.email@company.com"  # ← Change this
   inbox_folder_name: "Bandeja de entrada"         # ← Change if needed
-  target_folder_name: "TAGA"                      # ← Change this
-  target_subfolder_name: "RFQ"                    # ← Change if needed
+  target_folder_name: "EX:::"                      # ← Change this
+  target_subfolder_name: "ex:::"                    # ← Change if needed
 ```
 
 ### Step 3: Run the Workflow
