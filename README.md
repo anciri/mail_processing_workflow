@@ -71,7 +71,7 @@ mail_processing_workflow/
 python workflow.py
 
 # With date filtering
-python workflow.py --start-date 2024-01-01 --end-date 2024-12-31
+python workflow.py --start-date 2025-10-30 --end-date 2025-11-13
 
 # Extract only (no AI processing)
 python workflow.py --extract-only
