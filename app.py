@@ -1,6 +1,29 @@
 """
 Gradio Web Interface for Email Processing Workflow
 Provides a user-friendly UI for extracting and processing emails.
+
+UI INPUTS AND USAGE:
+====================
+1. START DATE / END DATE (from UI date inputs)
+   → Passed to extractor.process_folder() to filter emails by date range
+   → Parsed using utils.date_utils.parse_date()
+
+2. OUTPUT FILENAME (from UI text input)
+   → Used to customize output file names (emails.xlsx, emails_processed.xlsx, etc.)
+   → Applied by modifying config.OUTPUT_FILENAME before importing EmailProcessor
+   → Also used in processing to name the final output file
+
+3. PRODUCT CATEGORIZATION LIST (from UI large textbox)
+   → User can edit the product list used in AI prompts
+   → Injected into email_processing.PROMPT_TEMPLATE using regex replacement
+   → Allows customization without editing code
+
+4. SKIP CHECKPOINT (from UI checkbox)
+   → Controls whether workflow pauses for review after extraction
+   → If unchecked: stops after extraction for manual review
+   → If checked: runs extraction and processing automatically
+
+All UI inputs are actively used and affect the workflow execution.
 """
 import gradio as gr
 import os
@@ -8,6 +31,7 @@ import sys
 from datetime import datetime, timedelta
 from pathlib import Path
 import pandas as pd
+import re
 
 # Import workflow components
 from config_loader import get_config
@@ -52,7 +76,7 @@ def run_extraction(start_date, end_date, output_name, progress=gr.Progress()):
     try:
         progress(0, desc="Starting extraction...")
 
-        # Parse dates
+        # UI INPUT 1: Parse start_date and end_date from UI date inputs
         start_dt = parse_date(start_date) if start_date else None
         end_dt = parse_date(end_date) if end_date else None
 
@@ -62,29 +86,31 @@ def run_extraction(start_date, end_date, output_name, progress=gr.Progress()):
 
         progress(0.2, desc="Connecting to Outlook...")
 
-        # Create output filename
+        # UI INPUT 2: Use custom output_name from UI to create filenames
         output_file = f"{output_name}.xlsx" if output_name else "emails.xlsx"
         excluded_file = f"{output_name}_excluded.xlsx" if output_name else "emails_excluded.xlsx"
+        errors_file = f"{output_name}_errors.xlsx" if output_name else "emails_errors.xlsx"
 
-        progress(0.3, desc="Extracting emails...")
+        # Apply custom filenames by modifying config BEFORE importing EmailProcessor
+        import config
+        if output_name:
+            config.OUTPUT_FILENAME = output_file
+            config.EXCLUDED_FILENAME = excluded_file
+            config.ERRORS_FILENAME = errors_file
 
-        # Run extraction (simplified for UI)
-        # Note: This is a placeholder - actual implementation would call extractor
+        progress(0.3, desc="Extracting emails from Outlook...")
+
+        # Import and run extractor
         from extractor import EmailProcessor
         processor = EmailProcessor()
 
-        # Override output filenames if custom name provided
-        if output_name:
-            import config
-            config.OUTPUT_FILENAME = output_file
-            config.EXCLUDED_FILENAME = excluded_file
-
+        # Pass date filters from UI to extractor
         processor.process_folder(start_dt, end_dt)
 
         progress(1.0, desc="Extraction complete!")
 
-        # Get statistics
-        output_path = os.path.join('outputs', output_file)
+        # Get statistics from extracted file
+        output_path = os.path.join(config.OUTPUT_DIR, output_file)
         if os.path.exists(output_path):
             df = pd.read_excel(output_path)
             stats = f"✅ Extracted {len(df)} emails\n📁 Saved to: {output_path}"
@@ -93,17 +119,19 @@ def run_extraction(start_date, end_date, output_name, progress=gr.Progress()):
             return "⚠️ Extraction completed but no output file found", None, 0
 
     except Exception as e:
-        return f"❌ Error during extraction: {str(e)}", None, None
+        import traceback
+        error_details = traceback.format_exc()
+        return f"❌ Error during extraction: {str(e)}\n\nDetails:\n{error_details}", None, None
 
 
 def run_processing(extracted_file, output_name, product_list, progress=gr.Progress()):
     """
-    Run AI processing phase with custom product list.
+    Run AI processing phase with custom product list from UI.
 
     Args:
         extracted_file: Path to extracted emails file
         output_name: Custom name for output file
-        product_list: Custom product categorization list
+        product_list: Custom product categorization list from UI
         progress: Gradio progress tracker
 
     Returns:
@@ -122,31 +150,43 @@ def run_processing(extracted_file, output_name, product_list, progress=gr.Progre
         if total == 0:
             return "⚠️ No emails to process", None
 
-        progress(0.2, desc=f"Processing {total} emails with AI...")
+        progress(0.2, desc=f"Preparing AI analysis with custom product list...")
 
-        # Update prompt with custom product list
+        # Import email processing module
         import email_processing as ep
+
+        # UI INPUT 3: Apply custom product_list from UI to AI prompt
         if product_list.strip():
-            # Replace product list in prompt
-            ep.PROMPT_TEMPLATE = ep.PROMPT_TEMPLATE.replace(
-                DEFAULT_PRODUCT_LIST,
-                product_list
+            # Use regex to find and replace the product categorization list in the prompt
+            # This allows users to customize the product list without editing code
+            product_list_pattern = r'(When identifying equipment or products.*?:\n)(.*?)(\n\n\*\*Information Extraction)'
+
+            replacement = r'\1' + product_list.strip() + r'.\3'
+
+            # Replace the product list in the prompt template
+            ep.PROMPT_TEMPLATE = re.sub(
+                product_list_pattern,
+                replacement,
+                ep.PROMPT_TEMPLATE,
+                flags=re.DOTALL
             )
 
-        # Run processing
+        progress(0.3, desc=f"Processing {total} emails with AI...")
+
+        # Run async processing
         import asyncio
         results = asyncio.run(ep.process_all_emails(df))
 
-        progress(0.8, desc="Parsing results...")
+        progress(0.8, desc="Parsing AI responses...")
 
         # Parse results
         parsed = [ep.parse_xml(xml) for xml in results]
         df_parsed = pd.DataFrame(parsed)
 
-        # Merge with original
+        # Merge with original data
         df_final = pd.concat([df.reset_index(drop=True), df_parsed], axis=1)
 
-        # Save output
+        # UI INPUT 2: Use custom output_name from UI for processed file
         output_file = f"{output_name}_processed.xlsx" if output_name else "emails_processed.xlsx"
         output_path = os.path.join('outputs', output_file)
 
@@ -159,7 +199,9 @@ def run_processing(extracted_file, output_name, product_list, progress=gr.Progre
         return stats, output_path
 
     except Exception as e:
-        return f"❌ Error during processing: {str(e)}", None
+        import traceback
+        error_details = traceback.format_exc()
+        return f"❌ Error during processing: {str(e)}\n\nDetails:\n{error_details}", None
 
 
 def run_full_workflow(start_date, end_date, output_name, product_list,
@@ -187,12 +229,13 @@ def run_full_workflow(start_date, end_date, output_name, product_list,
     if not extracted_file:
         return extract_status, None, None
 
-    # Checkpoint
+    # UI INPUT 4: Check skip_checkpoint from UI checkbox
     if not skip_checkpoint:
+        # User wants to review extraction before processing
         checkpoint_msg = f"\n\n⏸️ CHECKPOINT\nPlease review: {extracted_file}\n\nClick 'Process Emails' to continue with AI analysis."
         return extract_status + checkpoint_msg, extracted_file, None
 
-    # Step 2: Processing (if auto-process)
+    # Step 2: Processing (auto-process when skip_checkpoint is True)
     progress(0.5, desc="Phase 2: Processing with AI...")
     process_status, processed_file = run_processing(
         extracted_file, output_name, product_list, progress
