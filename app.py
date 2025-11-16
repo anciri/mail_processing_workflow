@@ -10,7 +10,7 @@ UI INPUTS AND USAGE:
 
 2. OUTPUT FILENAME (from UI text input)
    → Used to customize output file names (emails.xlsx, emails_processed.xlsx, etc.)
-   → Applied by modifying config.OUTPUT_FILENAME before importing EmailProcessor
+   → Passed to EmailProcessor constructor as custom filenames
    → Also used in processing to name the final output file
 
 3. PRODUCT CATEGORIZATION LIST (from UI large textbox)
@@ -22,6 +22,13 @@ UI INPUTS AND USAGE:
    → Controls whether workflow pauses for review after extraction
    → If unchecked: stops after extraction for manual review
    → If checked: runs extraction and processing automatically
+
+WINDOWS COM THREADING:
+======================
+- Gradio runs functions in thread pools
+- Windows COM (Outlook automation) requires initialization in each thread
+- pythoncom.CoInitialize() called at start of extraction
+- pythoncom.CoUninitialize() called in finally block
 
 All UI inputs are actively used and affect the workflow execution.
 """
@@ -74,6 +81,12 @@ def run_extraction(start_date, end_date, output_name, progress=gr.Progress()):
         Tuple of (status_message, extracted_file_path, statistics)
     """
     try:
+        # Initialize COM for Windows threading (required for Outlook automation in Gradio threads)
+        import sys
+        if sys.platform == 'win32':
+            import pythoncom
+            pythoncom.CoInitialize()
+
         progress(0, desc="Starting extraction...")
 
         # UI INPUT 1: Parse start_date and end_date from UI date inputs
@@ -91,18 +104,21 @@ def run_extraction(start_date, end_date, output_name, progress=gr.Progress()):
         excluded_file = f"{output_name}_excluded.xlsx" if output_name else "emails_excluded.xlsx"
         errors_file = f"{output_name}_errors.xlsx" if output_name else "emails_errors.xlsx"
 
-        # Apply custom filenames by modifying config BEFORE importing EmailProcessor
-        import config
-        if output_name:
-            config.OUTPUT_FILENAME = output_file
-            config.EXCLUDED_FILENAME = excluded_file
-            config.ERRORS_FILENAME = errors_file
-
         progress(0.3, desc="Extracting emails from Outlook...")
 
-        # Import and run extractor
+        # Import and create extractor with custom filenames
         from extractor import EmailProcessor
-        processor = EmailProcessor()
+        import config
+
+        # Initialize processor with custom filenames (if provided)
+        if output_name:
+            processor = EmailProcessor(
+                output_filename=output_file,
+                excluded_filename=excluded_file,
+                errors_filename=errors_file
+            )
+        else:
+            processor = EmailProcessor()
 
         # Pass date filters from UI to extractor
         processor.process_folder(start_dt, end_dt)
@@ -122,6 +138,10 @@ def run_extraction(start_date, end_date, output_name, progress=gr.Progress()):
         import traceback
         error_details = traceback.format_exc()
         return f"❌ Error during extraction: {str(e)}\n\nDetails:\n{error_details}", None, None
+    finally:
+        # Uninitialize COM
+        if sys.platform == 'win32':
+            pythoncom.CoUninitialize()
 
 
 def run_processing(extracted_file, output_name, product_list, progress=gr.Progress()):
