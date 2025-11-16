@@ -36,11 +36,24 @@ from outlook.connector import OutlookConnector
 class EmailProcessor:
     """Main email processing orchestrator"""
 
-    def __init__(self):
+    def __init__(self, output_filename=None, excluded_filename=None, errors_filename=None):
+        """
+        Initialize EmailProcessor with optional custom output filenames.
+
+        Args:
+            output_filename: Custom filename for extracted emails (default: from config)
+            excluded_filename: Custom filename for excluded emails (default: from config)
+            errors_filename: Custom filename for error emails (default: from config)
+        """
         self.email_extractor = EmailExtractor()
         self.content_analyzer = ContentAnalyzer()
         self.location_extractor = LocationExtractor()
         self.outlook_connector = OutlookConnector()
+
+        # Use custom filenames if provided, otherwise use defaults from config
+        self.output_filename = output_filename or OUTPUT_FILENAME
+        self.excluded_filename = excluded_filename or EXCLUDED_FILENAME
+        self.errors_filename = errors_filename or ERRORS_FILENAME
 
     def process_folder(
         self,
@@ -264,12 +277,12 @@ class EmailProcessor:
         excluded: List[ExcludedEmail],
         errors: List[ProcessingError]
     ) -> None:
-        """Save results to Excel files"""
+        """Save results to Excel files using custom or default filenames"""
         os.makedirs(OUTPUT_DIR, exist_ok=True)
 
         # Save valid RFQ emails
         if results:
-            output_path = os.path.join(OUTPUT_DIR, OUTPUT_FILENAME)
+            output_path = os.path.join(OUTPUT_DIR, self.output_filename)
             results_dicts = [email.to_dict() for email in results]
             df = pd.DataFrame(results_dicts)
             df.to_excel(output_path, index=False)
@@ -279,7 +292,7 @@ class EmailProcessor:
 
         # Save excluded emails
         if excluded:
-            excluded_path = os.path.join(OUTPUT_DIR, EXCLUDED_FILENAME)
+            excluded_path = os.path.join(OUTPUT_DIR, self.excluded_filename)
             excluded_dicts = [email.to_dict() for email in excluded]
             df_excluded = pd.DataFrame(excluded_dicts)
             df_excluded.to_excel(excluded_path, index=False)
@@ -287,7 +300,7 @@ class EmailProcessor:
 
         # Save error emails
         if errors:
-            error_path = os.path.join(OUTPUT_DIR, ERRORS_FILENAME)
+            error_path = os.path.join(OUTPUT_DIR, self.errors_filename)
             error_dicts = [error.to_dict() for error in errors]
             df_errors = pd.DataFrame(error_dicts)
             df_errors.to_excel(error_path, index=False)
