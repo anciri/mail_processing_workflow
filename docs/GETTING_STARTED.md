@@ -146,7 +146,50 @@ This shows your exact folder structure.
 
 ---
 
-### Basic Workflow
+### Option 1: Web Interface (Recommended for Beginners)
+
+**Easy graphical interface - no command line needed!**
+
+1. **Open Command Prompt**
+   ```bash
+   cd C:\EmailWorkflow
+   ```
+
+2. **Start the web interface**
+   ```bash
+   python app.py
+   ```
+
+3. **Open your browser**
+   - Go to: **http://localhost:7860**
+   - The interface will open automatically
+
+4. **Use the interface:**
+   - **Set Date Range**: Enter start and end dates (YYYY-MM-DD format)
+   - **Custom Filename**: (Optional) Name your output files
+   - **Edit Products**: (Optional) Modify the product categorization list
+   - **Click "Run Full Workflow"** or use individual steps:
+     - "Extract Emails" - Only extract from Outlook
+     - "Process Emails" - Only process already extracted data
+   - **Review Results**: Download files directly from the interface
+
+5. **What you see:**
+   - Live progress updates
+   - Status messages
+   - Download buttons for results
+   - Current configuration display
+
+**Benefits:**
+- 👍 Visual controls - no typing commands
+- 👍 See progress in real-time
+- 👍 Edit product list without touching code
+- 👍 Download results with one click
+
+---
+
+### Option 2: Command Line (Advanced Users)
+
+**For users comfortable with command line operations.**
 
 1. **Open Command Prompt**
    ```bash

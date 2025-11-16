@@ -14,8 +14,12 @@ pip install -r requirements.txt
 python setup_config.py
 # Edit workflow_config.yaml and .env with your settings
 
-# 3. Run workflow
+# 3a. Run workflow (Command Line)
 python workflow.py
+
+# 3b. Run workflow (Web Interface)
+python app.py
+# Then open http://localhost:7860 in your browser
 ```
 
 **That's it!** See [Getting Started Guide](docs/GETTING_STARTED.md) for detailed instructions.
@@ -64,7 +68,29 @@ mail_processing_workflow/
 
 ---
 
-## 💡 Common Commands
+## 🌐 Web Interface (Gradio UI)
+
+**New!** Run the workflow through a user-friendly web interface:
+
+```bash
+python app.py
+```
+
+Then open **http://localhost:7860** in your browser.
+
+**Features:**
+- 📅 Select date range with visual controls
+- 📝 Customize output filenames
+- 🏷️ Edit product categorization list in real-time
+- ▶️ Run extraction, processing, or full workflow
+- 📊 Track progress with live updates
+- 💾 Download results directly from the interface
+
+Perfect for non-technical users who prefer a graphical interface!
+
+---
+
+## 💡 Command Line Options
 
 ```bash
 # Basic workflow with checkpoint
@@ -185,6 +211,8 @@ These are already in `.gitignore`. See [Security Guidelines](docs/SECURITY.md).
 - ✅ Multiple output formats (Excel)
 - ✅ Detailed error logging
 - ✅ OpenRouter support for multiple AI models
+- ✅ **Web interface (Gradio)** for easy non-technical use
+- ✅ Customizable product categorization in UI
 
 ---
 
