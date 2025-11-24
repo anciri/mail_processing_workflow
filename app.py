@@ -42,6 +42,7 @@ import re
 
 # Import workflow components
 from config_loader import get_config
+from config import OUTPUT_DIR, OUTPUT_FILENAME
 from extractor import EmailProcessor as EmailExtractor
 from utils.date_utils import parse_date
 
@@ -158,8 +159,16 @@ def run_processing(extracted_file, output_name, product_list, progress=gr.Progre
         Tuple of (status_message, processed_file_path)
     """
     try:
-        if not extracted_file or not os.path.exists(extracted_file):
-            return "❌ Error: No extracted emails file found. Run extraction first.", None
+        # Handle case where extracted_file is None (user skipped extraction)
+        if not extracted_file:
+            default_file = os.path.join(OUTPUT_DIR, OUTPUT_FILENAME)
+            if os.path.exists(default_file):
+                extracted_file = default_file
+                progress(0.1, desc=f"Using default file: {OUTPUT_FILENAME}")
+            else:
+                return "❌ Error: No extracted emails file found. Run extraction first.", None
+        elif not os.path.exists(extracted_file):
+             return "❌ Error: No extracted emails file found. Run extraction first.", None
 
         progress(0, desc="Loading extracted emails...")
 
@@ -173,34 +182,25 @@ def run_processing(extracted_file, output_name, product_list, progress=gr.Progre
         progress(0.2, desc=f"Preparing AI analysis with custom product list...")
 
         # Import email processing module
-        import email_processing as ep
+        from email_processing import AIProcessor
+        
+        # Initialize processor
+        processor = AIProcessor()
 
         # UI INPUT 3: Apply custom product_list from UI to AI prompt
         if product_list.strip():
-            # Use regex to find and replace the product categorization list in the prompt
-            # This allows users to customize the product list without editing code
-            product_list_pattern = r'(When identifying equipment or products.*?:\n)(.*?)(\n\n\*\*Information Extraction)'
-
-            replacement = r'\1' + product_list.strip() + r'.\3'
-
-            # Replace the product list in the prompt template
-            ep.PROMPT_TEMPLATE = re.sub(
-                product_list_pattern,
-                replacement,
-                ep.PROMPT_TEMPLATE,
-                flags=re.DOTALL
-            )
+            processor.update_product_list(product_list)
 
         progress(0.3, desc=f"Processing {total} emails with AI...")
 
         # Run async processing
         import asyncio
-        results = asyncio.run(ep.process_all_emails(df))
+        results = asyncio.run(processor.process_all_emails(df))
 
         progress(0.8, desc="Parsing AI responses...")
 
         # Parse results
-        parsed = [ep.parse_xml(xml) for xml in results]
+        parsed = [processor.parse_json(json_str) for json_str in results]
         df_parsed = pd.DataFrame(parsed)
 
         # Merge with original data

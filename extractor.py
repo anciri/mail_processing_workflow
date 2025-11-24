@@ -59,13 +59,16 @@ class EmailProcessor:
         self,
         start_date: Optional[datetime] = None,
         end_date: Optional[datetime] = None
-    ) -> None:
+    ) -> tuple:
         """
         Main function to process emails from specified Outlook folder.
 
         Args:
             start_date: Optional start date for filtering emails (inclusive)
             end_date: Optional end date for filtering emails (inclusive)
+            
+        Returns:
+            Tuple of (success: bool, stats: ProcessingStats, output_path: str)
         """
         try:
             # Connect to Outlook
@@ -96,11 +99,14 @@ class EmailProcessor:
             print(stats)
 
             # Save results to Excel files
-            self._save_results(results, excluded, errors)
+            output_path = self._save_results(results, excluded, errors)
+            
+            return True, stats, output_path
 
         except Exception as e:
             print(f"Ocurrió un error inesperado: {e}")
             print("Por favor, asegúrate de que Outlook esté abierto y las carpetas existan.")
+            return False, None, None
 
     def _print_date_filter_info(
         self,
@@ -276,19 +282,26 @@ class EmailProcessor:
         results: List[EmailData],
         excluded: List[ExcludedEmail],
         errors: List[ProcessingError]
-    ) -> None:
-        """Save results to Excel files using custom or default filenames"""
+    ) -> str:
+        """
+        Save results to Excel files using custom or default filenames.
+        
+        Returns:
+            Path to the main output file
+        """
         os.makedirs(OUTPUT_DIR, exist_ok=True)
+        output_path = os.path.join(OUTPUT_DIR, self.output_filename)
 
         # Save valid RFQ emails
         if results:
-            output_path = os.path.join(OUTPUT_DIR, self.output_filename)
             results_dicts = [email.to_dict() for email in results]
             df = pd.DataFrame(results_dicts)
             df.to_excel(output_path, index=False)
             print(f"\n¡Análisis completo! {len(results)} correos guardados en '{output_path}'")
         else:
             print("\nNo se encontraron correos en la carpeta.")
+            # Create empty file if needed or handle as appropriate
+            # For now, we still return the path where it would be
 
         # Save excluded emails
         if excluded:
@@ -305,6 +318,8 @@ class EmailProcessor:
             df_errors = pd.DataFrame(error_dicts)
             df_errors.to_excel(error_path, index=False)
             print(f"Errores de procesamiento guardados en '{error_path}'")
+            
+        return output_path
 
 
 def main():
